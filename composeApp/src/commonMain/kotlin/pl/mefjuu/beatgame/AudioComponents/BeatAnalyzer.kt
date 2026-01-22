@@ -16,15 +16,17 @@ import java.util.ArrayList
 import java.util.Collections
 import java.util.Locale
 
-class BeatAnalyzer {
+class BeatAnalyzer() {
     // Parametry analizy
     private val SAMPLE_RATE = 44100
     private val BUFFER_SIZE = 256
     private val OVERLAP = 128
     private val MERGE_THRESHOLD = 0.1 // sekundy — scalanie bliskich beatów
-    private val KICK_GAP_THRESHOLD = 0.25 // sekundy — odstęp między kickami
+    private var KICK_GAP_THRESHOLD = 0.25 // sekundy — odstęp między kickami
 
-    fun analyzeAndExport(audioPath: String) {
+    fun analyzeAndExport(audioPath: String): Int {
+        var countBeats = 0
+
         try {
             val audioFile = File(audioPath)
             val baseName = audioFile.getName().replace("\\.[^.]+$".toRegex(), "")
@@ -75,15 +77,17 @@ class BeatAnalyzer {
                     writer.write("Time(s),Type\n")
                     for (b in allBeats) {
                         writer.write(String.Companion.format(Locale.US, "%.3f,%s\n", b.time, b.type))
+                        countBeats++;
                     }
                 }
-                println("✅ Beatmap was generated: " + csvPath.toAbsolutePath())
+                println("✅ Beatmap was generated: " + csvPath.toAbsolutePath() + " detected $countBeats beats")
             } else if (Files.exists(Path.of("beatmaps\\" + baseName))) {
                 println("No need to analyzing, beat map was already created.")
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        return countBeats
     }
 
     private fun mergeCloseTimes(times: List<Double>, threshold: Double): List<Double> {

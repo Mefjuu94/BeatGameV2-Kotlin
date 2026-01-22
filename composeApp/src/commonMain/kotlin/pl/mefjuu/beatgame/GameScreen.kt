@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import pl.mefjuu.beatgame.AudioComponents.AudioPlayer
 import pl.mefjuu.beatgame.AudioComponents.BeatMap
 import kotlin.math.*
+import kotlin.random.Random
 
 @Composable
 fun GameScreen(
@@ -56,6 +57,7 @@ fun GameScreen(
     val audioPlayer = remember { AudioPlayer(pathToWav) }
     val beatMap = remember { BeatMap(pathToCsv) }
     var beatenBeats by remember { mutableIntStateOf(0) }
+    var beatsLeft by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
     val flashAlpha = remember { Animatable(0f) }
@@ -136,16 +138,47 @@ fun GameScreen(
         }
     }
 
+    // Tworzymy listę gwiazd raz przy starcie ekranu
+    val stars = remember {
+        List(250) {
+            WarpStar(
+                x = (Random.nextFloat() * 2000 - 1000),
+                y = (Random.nextFloat() * 2000 - 1000),
+                z = Random.nextFloat() * 1000
+            )
+        }
+    }
+
+    // Dynamiczna prędkość zależna od combo lub błysku
+    val warpSpeed = 10f + (flashAlpha.value * 40f)
+
     // --- ŁADOWANIE I PĘTLA GRY ---
     LaunchedEffect(baseName) {
+
+        val minInterval = when (difficulty.lowercase()) {
+            "easy" -> 0.5    //  2nuty
+            "medium" -> 0.25  // Maksymalnie 4 nut na sekundę
+            "hard" -> 0.1   // Maksymalnie ~10 nut na sekundę (bardzo gęsto)
+            else -> 0.2
+        }
+
         isLoading = true
         val rawBeats = beatMap.getBeats()
         leftBeats.clear()
         rightBeats.clear()
         var lastTime = -1.0
         rawBeats.forEach { beat ->
-            if (beat.time - lastTime >= 0.1) {
-                if (leftBeats.size <= rightBeats.size) leftBeats.add(beat) else rightBeats.add(beat)
+            // Sprawdzamy, czy nuta nie jest za blisko poprzedniej dla danego poziomu
+            if (beat.time - lastTime >= minInterval) {
+                beatsLeft ++;
+
+                // Tutaj decydujesz o podziale na strony
+                if (leftBeats.size <= rightBeats.size) {
+                    leftBeats.add(beat)
+                } else {
+                    rightBeats.add(beat)
+                }
+
                 lastTime = beat.time
             }
         }
@@ -200,26 +233,45 @@ fun GameScreen(
                 val currentColor2 = lerp(baseColor2, currentTargetColor2, flashAlpha.value)
                 drawRect(brush = Brush.verticalGradient(listOf(currentColor1, currentColor2)), size = size)
 
-                // --- 2. TUNEL ---
-                val tunnelLines = 50
-                for (i in 0 until tunnelLines) {
-                    val angle = (i.toFloat() / tunnelLines) * 2 * PI.toFloat()
-                    val lineProgress = (currentTime.toFloat() * 0.4f + (i.toFloat() / tunnelLines)) % 1.0f
-                    val startDist = lineProgress * lineProgress * (canvasWidth * 0.05f)
-                    val endDist = lineProgress * (canvasWidth * 1.5f)
-                    val startX = centerX + cos(angle) * startDist + moveGameToRight
-                    val startY = centerY + sin(angle) * startDist
-                    val endX = centerX + cos(angle) * endDist + moveGameToRight
-                    val endY = centerY + sin(angle) * endDist
-                    val lineColor = if (i % 2 == 0) Color(0xFF00FBFF) else Color(0xFFFF00FF)
+
+                val warpCenterX = centerX + moveGameToRight
+
+                // --- 1. TŁO GRADIENTOWE (POŚWIATA ŚRODKA) ---
+                // Używamy kolorów animowanych (animLeft/animRight) dla poświaty
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0f to Color.White.copy(alpha = 0.05f + flashAlpha.value * 0.1f),
+                        0.5f to animLeft.copy(alpha = 0.1f),
+                        1f to Color.Transparent,
+                        center = Offset(warpCenterX, centerY)
+                    ),
+                    radius = canvasWidth * 0.8f,
+                    center = Offset(warpCenterX, centerY)
+                )
+
+                // --- 2. NOWY TUNEL WARP (ZGODNY Z OBRAZKIEM) ---
+                stars.forEach { star ->
+                    if (!isPaused) star.update(warpSpeed)
+
+                    // Projekcja 3D na 2D: (pos / z) * skala + offset
+                    val px = (star.x / star.prevZ) * centerX + warpCenterX
+                    val py = (star.y / star.prevZ) * centerY + centerY
+                    val sx = (star.x / star.z) * centerX + warpCenterX
+                    val sy = (star.y / star.z) * centerY + centerY
+
+                    // Kolor: Lewa strona niebieska, prawa pomarańczowa (jak na obrazku)
+                    // Wykorzystujemy Twoje animLeft i animRight dla spójności
+                    val starBaseColor = if (star.x < 0) animLeft else animRight
+
+                    // Przezroczystość rośnie, im bliżej nas jest gwiazda
+                    val alpha = (1f - star.z / 1000f).coerceIn(0f, 1f)
 
                     drawLine(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color.Transparent, lineColor.copy(alpha = 0.25f * lineProgress)),
-                            start = Offset(startX, startY), end = Offset(endX, endY)
-                        ),
-                        start = Offset(startX, startY), end = Offset(endX, endY),
-                        strokeWidth = 1f + 3f * lineProgress, cap = StrokeCap.Round
+                        color = starBaseColor.copy(alpha = alpha),
+                        start = Offset(px, py),
+                        end = Offset(sx, sy),
+                        strokeWidth = (1f + (1f - star.z / 1000f) * 6f), // Linie grubieją przy krawędziach
+                        cap = StrokeCap.Round
                     )
                 }
 
@@ -318,7 +370,8 @@ fun GameScreen(
                 Text("COMBO", color = Color.Magenta.copy(0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text("x$combo", color = Color(0xFFFF00FF), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(32.dp))
-                Text("beats: $beatenBeats / ${beatMap.getBeats().size} ", color = Color(0xFFFF00FF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("beats: $beatenBeats / ${leftBeats} ", color = Color(0xFFFF00FF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                ///naprawić!!
                 Spacer(Modifier.height(32.dp))
                 GameButton(if (isPaused) "RESUME" else "PAUSE", Color.Cyan) {
                     isPaused = !isPaused
@@ -340,6 +393,22 @@ fun GameScreen(
                 } else false
             })
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
+        }
+    }
+}
+
+data class WarpStar(
+    var x: Float, // Pozycja względem środka
+    var y: Float,
+    var z: Float, // Głębia (1000 = daleko, 0 = tuż przed ekranem)
+    var prevZ: Float = z
+) {
+    fun update(speed: Float) {
+        prevZ = z
+        z -= speed
+        if (z <= 1) { // Reset gwiazdy, gdy przeleci za nas
+            z = 1000f
+            prevZ = z
         }
     }
 }
