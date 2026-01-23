@@ -37,6 +37,7 @@ fun GameScreen(
     baseName: String,
     difficulty: String,
     settings: GameSettings,
+    drawBackground: Boolean,
     onBackToMenu: () -> Unit
 ) {
     // --- STAN GRY ---
@@ -81,6 +82,8 @@ fun GameScreen(
     val scope = rememberCoroutineScope()
     val audioVisualOffset = -0.1
 
+    val drawDynamicBackground = drawBackground
+
     val dynamicHue by remember(currentTime) {
         derivedStateOf { (currentTime * 20f % 360f).toFloat() }
     }
@@ -104,7 +107,6 @@ fun GameScreen(
     fun checkHit(beats: MutableList<Beat>, side: String) {
         val visualTime = currentTime + audioVisualOffset
         val iterator = beats.iterator()
-        var hitFound = false
 
         while (iterator.hasNext()) {
             val beat = iterator.next()
@@ -127,15 +129,12 @@ fun GameScreen(
                 score = score + 10 + combo
                 combo++
                 beatenBeats += 1
-                hitFound = true
                 return
             }
         }
 
-        if (!hitFound) {
-            combo = 0
-            hitWaves.add(HitWave(currentTime, side, isMiss = true)) // Czerwona fala pudła
-        }
+        combo = 0
+        hitWaves.add(HitWave(currentTime, side, isMiss = true)) // Czerwona fala pudła
     }
 
     // Tworzymy listę gwiazd raz przy starcie ekranu
@@ -249,30 +248,32 @@ fun GameScreen(
                     center = Offset(warpCenterX, centerY)
                 )
 
-                // --- 2. NOWY TUNEL WARP (ZGODNY Z OBRAZKIEM) ---
-                stars.forEach { star ->
-                    if (!isPaused) star.update(warpSpeed)
+                // --- 2. TUNEL WARP ---
+                if(drawDynamicBackground) {
+                    stars.forEach { star ->
+                        if (!isPaused) star.update(warpSpeed)
 
-                    // Projekcja 3D na 2D: (pos / z) * skala + offset
-                    val px = (star.x / star.prevZ) * centerX + warpCenterX
-                    val py = (star.y / star.prevZ) * centerY + centerY
-                    val sx = (star.x / star.z) * centerX + warpCenterX
-                    val sy = (star.y / star.z) * centerY + centerY
+                        // Projekcja 3D na 2D: (pos / z) * skala + offset
+                        val px = (star.x / star.prevZ) * centerX + warpCenterX
+                        val py = (star.y / star.prevZ) * centerY + centerY
+                        val sx = (star.x / star.z) * centerX + warpCenterX
+                        val sy = (star.y / star.z) * centerY + centerY
 
-                    // Kolor: Lewa strona niebieska, prawa pomarańczowa (jak na obrazku)
-                    // Wykorzystujemy Twoje animLeft i animRight dla spójności
-                    val starBaseColor = if (star.x < 0) animLeft else animRight
+                        // Kolor: Lewa strona niebieska, prawa pomarańczowa (jak na obrazku)
+                        // Wykorzystujemy Twoje animLeft i animRight dla spójności
+                        val starBaseColor = if (star.x < 0) animLeft else animRight
 
-                    // Przezroczystość rośnie, im bliżej nas jest gwiazda
-                    val alpha = (1f - star.z / 1000f).coerceIn(0f, 1f)
+                        // Przezroczystość rośnie, im bliżej nas jest gwiazda
+                        val alpha = (1f - star.z / 1000f).coerceIn(0f, 1f)
 
-                    drawLine(
-                        color = starBaseColor.copy(alpha = alpha),
-                        start = Offset(px, py),
-                        end = Offset(sx, sy),
-                        strokeWidth = (1f + (1f - star.z / 1000f) * 6f), // Linie grubieją przy krawędziach
-                        cap = StrokeCap.Round
-                    )
+                        drawLine(
+                            color = starBaseColor.copy(alpha = alpha),
+                            start = Offset(px, py),
+                            end = Offset(sx, sy),
+                            strokeWidth = (1f + (1f - star.z / 1000f) * 6f), // Linie grubieją przy krawędziach
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
 
                 // --- 3. NUTY
@@ -370,7 +371,7 @@ fun GameScreen(
                 Text("COMBO", color = Color.Magenta.copy(0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text("x$combo", color = Color(0xFFFF00FF), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(32.dp))
-                Text("beats: $beatenBeats / ${leftBeats} ", color = Color(0xFFFF00FF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("beats: $beatenBeats / ${leftBeats.size}", color = Color(0xFFFF00FF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 ///naprawić!!
                 Spacer(Modifier.height(32.dp))
                 GameButton(if (isPaused) "RESUME" else "PAUSE", Color.Cyan) {

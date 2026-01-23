@@ -14,16 +14,18 @@ fun App() {
 
     // Tu trzymamy nasze klawisze, aby gra wiedziała, jakich użyć
     var gameSettings by remember { mutableStateOf(GameSettings()) }
+    var drawBackground by remember { mutableStateOf(true) }
 
     when (currentScreen) {
         Screen.Menu -> {
             MainMenuScreen(
                 initialSettings = gameSettings,
-                onStartGame = { song, diff, finalSettings ->
+                onStartGame = { song, diff, finalSettings, background ->
                     selectedSong = song
                     difficulty = diff
                     gameSettings = finalSettings // Zapisujemy klawisze przed startem
                     currentScreen = Screen.Game
+                    drawBackground = background
                 }
             )
         }
@@ -31,7 +33,8 @@ fun App() {
             GameScreen(
                 baseName = selectedSong,
                 difficulty = difficulty,
-                settings = gameSettings, // PRZEKAZUJEMY SETTINGS - Błąd naprawiony!
+                settings = gameSettings,
+                drawBackground = drawBackground,
                 onBackToMenu = { currentScreen = Screen.Menu }
             )
         }

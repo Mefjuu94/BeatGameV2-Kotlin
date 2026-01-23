@@ -87,7 +87,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "pl.mefjuu.beatgame.MainKt"
+        mainClass = "pl.mefjuu.beatgame.App.kt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)

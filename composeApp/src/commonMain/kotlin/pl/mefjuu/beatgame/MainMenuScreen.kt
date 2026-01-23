@@ -26,7 +26,7 @@ import java.io.File
 @Composable
 fun MainMenuScreen(
     initialSettings: GameSettings,
-    onStartGame: (String, String, GameSettings) -> Unit
+    onStartGame: (String, String, GameSettings, Boolean) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var selectedSongName by remember { mutableStateOf("No song selected") }
@@ -53,6 +53,7 @@ fun MainMenuScreen(
         mutableStateOf(selectedBaseName?.let { File("beatmaps/$it").exists() } ?: false)
     }
     var beatsDetected by remember { mutableStateOf(0) }
+    var background by remember { mutableStateOf(true) }
 
     Column(
         modifier = Modifier.fillMaxSize().background(Color(0xFFFDFCF0)).padding(20.dp),
@@ -199,8 +200,16 @@ fun MainMenuScreen(
         }
         Spacer(modifier = Modifier.height(30.dp))
 
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { background = !background }) {
+            Switch(checked = background, onCheckedChange = { background = it })
+            Spacer(Modifier.width(8.dp))
+            Text("Dynamic background")
+        }
+
+        Spacer(modifier = Modifier.height(30.dp))
+
         Button(
-            onClick = { selectedBaseName?.let { onStartGame(it, selectedDifficulty, currentSettings) } },
+            onClick = { selectedBaseName?.let { onStartGame(it, selectedDifficulty, currentSettings, background) } },
             enabled = isStartEnabled,
             modifier = Modifier.width(200.dp).height(50.dp)
         ) { Text("Start Game", fontSize = 20.sp) }
