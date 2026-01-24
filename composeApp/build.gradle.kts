@@ -87,12 +87,27 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "pl.mefjuu.beatgame.App.kt"
+        // USUNĄŁEM .kt i upewniłem się, że ścieżka pasuje do Twojego package
+        mainClass = "pl.mefjuu.beatgame.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "pl.mefjuu.beatgame"
+            // Dodajemy Exe do formatów docelowych
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
+
+            // To będzie nazwa Twojego pliku .exe (lepiej bez kropek)
+            packageName = "BeatGame"
             packageVersion = "1.0.0"
+
+            // Opcjonalnie: dodaj opis i menu start
+            includeAllModules = true
+            description = "Gra rytmiczna"
+            copyright = "© 2026 Mefjuu94"
+
+            windows {
+                shortcut = true // To stworzy skrót na pulpicie
+                menu = true     // To doda grę do menu Start
+                iconFile.set(project.file("icons/icon.ico")) // Jeśli masz plik ikony
+            }
         }
     }
 }

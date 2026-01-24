@@ -259,8 +259,6 @@ fun GameScreen(
                         val sx = (star.x / star.z) * centerX + warpCenterX
                         val sy = (star.y / star.z) * centerY + centerY
 
-                        // Kolor: Lewa strona niebieska, prawa pomarańczowa (jak na obrazku)
-                        // Wykorzystujemy Twoje animLeft i animRight dla spójności
                         val starBaseColor = if (star.x < 0) animLeft else animRight
 
                         // Przezroczystość rośnie, im bliżej nas jest gwiazda

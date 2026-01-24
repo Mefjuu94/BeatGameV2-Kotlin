@@ -209,6 +209,12 @@ fun MainMenuScreen(
         Spacer(modifier = Modifier.height(30.dp))
 
         Button(
+            onClick = { showControlsDialog = true },
+        ) { Text("set keys", fontSize = 14.sp) }
+
+        Spacer(modifier = Modifier.height(30.dp))
+
+        Button(
             onClick = { selectedBaseName?.let { onStartGame(it, selectedDifficulty, currentSettings, background) } },
             enabled = isStartEnabled,
             modifier = Modifier.width(200.dp).height(50.dp)
