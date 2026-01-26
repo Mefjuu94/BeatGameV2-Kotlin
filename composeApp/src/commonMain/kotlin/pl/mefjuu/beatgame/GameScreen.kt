@@ -26,9 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import pl.mefjuu.beatgame.AudioComponents.AudioPlayer
 import pl.mefjuu.beatgame.AudioComponents.BeatMap
+import pl.mefjuu.beatgame.Efects.Spark
+import pl.mefjuu.beatgame.Efects.WarpStar
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -79,10 +80,10 @@ fun GameScreen(
     val animLeft by animateColorAsState(targetValue = currentLeftColor, animationSpec = tween(200))
     val animRight by animateColorAsState(targetValue = currentRightColor, animationSpec = tween(200))
 
-    val scope = rememberCoroutineScope()
     val audioVisualOffset = -0.1
 
     val drawDynamicBackground = drawBackground
+    val sparks = remember { mutableStateListOf<Spark>() }
 
     val dynamicHue by remember(currentTime) {
         derivedStateOf { (currentTime * 20f % 360f).toFloat() }
@@ -93,18 +94,10 @@ fun GameScreen(
         currentRightColor = Color.hsv(hue = (dynamicHue + 180f) % 360f, saturation = 0.8f, value = 1f)
     }
 
-    // Funkcja pomocnicza do błysków tła
-    fun randomFlashColor(): Color {
-        // Losujemy pełny odcień, ale z niską przezroczystością, żeby nie oślepiało
-        return Color.hsv(
-            hue = (0..360).random().toFloat(),
-            saturation = 0.6f,
-            value = 0.4f // Niższa wartość = ciemniejszy, głębszy błysk
-        )
-    }
+    var beatsToHit by remember { mutableStateOf(0) }
 
     // --- LOGIKA TRAFIENIA (OKNO 0.2s + MISS) ---
-    fun checkHit(beats: MutableList<Beat>, side: String) {
+    fun checkHit(beats: MutableList<Beat>, side: String, targetX: Float, targetY: Float) {
         val visualTime = currentTime + audioVisualOffset
         val iterator = beats.iterator()
 
@@ -112,29 +105,40 @@ fun GameScreen(
             val beat = iterator.next()
             val delta = abs(beat.time - visualTime)
 
-            // 0.1s w każdą stronę od idealnego punktu = 0.2s okna
             if (delta < 0.1) {
-                currentTargetColor1 = randomFlashColor()
-                currentTargetColor2 = randomFlashColor()
+                // --- GENEROWANIE ISKIER (SPAWANIE) ---
+                val weldingColors = listOf(
+                    Color(0xFFFFFFFF), // Czysty biały (najgorętszy)
+                    Color(0xFFFFFAED), // Bardzo jasny żółty
+                    Color(0xFFFFD700), // Złoty
+                    Color(0xFFFF8C00)  // Pomarańczowy (chłodniejszy odłamek)
+                )
 
-                scope.launch {
-                    flashAlpha.snapTo(0f)
-                    flashAlpha.animateTo(0.2f, tween(50))
-                    flashAlpha.animateTo(0f, tween(400))
+                repeat(20) {
+                    val angle = (Random.nextFloat() * PI.toFloat()) + PI.toFloat()
+                    val speed = Random.nextFloat() * 12f + 4f
+
+                    sparks.add(Spark(
+                        x = targetX,
+                        y = targetY,
+                        vx = cos(angle) * speed,
+                        vy = sin(angle) * speed,
+                        // Losuj kolor z palety spawania
+                        color = weldingColors.random()
+                    ))
                 }
 
                 hitWaves.add(HitWave(currentTime, side, isMiss = false))
                 beat.isHit = true
                 iterator.remove()
-                score = score + 10 + combo
+                score += 10 + combo
                 combo++
-                beatenBeats += 1
+                beatenBeats++
                 return
             }
         }
-
         combo = 0
-        hitWaves.add(HitWave(currentTime, side, isMiss = true)) // Czerwona fala pudła
+        hitWaves.add(HitWave(currentTime, side, isMiss = true))
     }
 
     // Tworzymy listę gwiazd raz przy starcie ekranu
@@ -155,7 +159,7 @@ fun GameScreen(
     LaunchedEffect(baseName) {
 
         val minInterval = when (difficulty.lowercase()) {
-            "easy" -> 0.5    //  2nuty
+            "easy" -> 0.5    //  2 nuty/s
             "medium" -> 0.25  // Maksymalnie 4 nut na sekundę
             "hard" -> 0.1   // Maksymalnie ~10 nut na sekundę (bardzo gęsto)
             else -> 0.2
@@ -166,13 +170,16 @@ fun GameScreen(
         leftBeats.clear()
         rightBeats.clear()
         var lastTime = -1.0
-        rawBeats.forEach { beat ->
-            // Sprawdzamy, czy nuta nie jest za blisko poprzedniej dla danego poziomu
-            if (beat.time - lastTime >= minInterval) {
-                beatsLeft ++;
 
-                // Tutaj decydujesz o podziale na strony
-                if (leftBeats.size <= rightBeats.size) {
+        val songRandom = Random(baseName.hashCode()) // randomowo dobiera nuty
+
+        rawBeats.forEach { beat ->
+            if (beat.time - lastTime >= minInterval) {
+                beatsLeft++
+
+                val lane = songRandom.nextInt(2)
+
+                if (lane == 0) {
                     leftBeats.add(beat)
                 } else {
                     rightBeats.add(beat)
@@ -181,12 +188,26 @@ fun GameScreen(
                 lastTime = beat.time
             }
         }
+
+        // do obliczenia ile całości (aby nie zmieniało w czasie)
+        beatsToHit = beatsLeft
+
         audioPlayer.play()
         isLoading = false
         while (true) {
             withFrameMillis {
                 if (!isPaused) {
                     currentTime = audioPlayer.timeSeconds
+
+                    // --- AKTUALIZACJA ISKIER ---
+                    val delta = 0.016f // Stały krok czasu dla 60fps
+                    val sparkIterator = sparks.iterator()
+                    while (sparkIterator.hasNext()) {
+                        val s = sparkIterator.next()
+                        s.update(delta)
+                        if (s.life <= 0) sparkIterator.remove()
+                    }
+
                     hitWaves.removeAll { currentTime - it.time > 0.5 }
                     if (currentTime >= audioPlayer.durationSeconds && audioPlayer.durationSeconds > 0) {
                         isGameOver = true
@@ -218,8 +239,9 @@ fun GameScreen(
     } else if (isGameOver) {
         EndScreen(score, beatenBeats, leftBeats.size + rightBeats.size + beatenBeats, onBackToMenu)
     } else {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
             Canvas(Modifier.fillMaxSize()) {
+
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 val centerX = canvasWidth / 2f
@@ -236,7 +258,6 @@ fun GameScreen(
                 val warpCenterX = centerX + moveGameToRight
 
                 // --- 1. TŁO GRADIENTOWE (POŚWIATA ŚRODKA) ---
-                // Używamy kolorów animowanych (animLeft/animRight) dla poświaty
                 drawCircle(
                     brush = Brush.radialGradient(
                         0f to Color.White.copy(alpha = 0.05f + flashAlpha.value * 0.1f),
@@ -359,7 +380,33 @@ fun GameScreen(
                         )
                     }
                 }
+                // --- 6. RYSOWANIE ISKIER ---
+                sparks.forEach { spark ->
+                    val trailLength = 0.6f
+                    val start = Offset(spark.x, spark.y)
+                    val end = Offset(spark.x - spark.vx * trailLength, spark.y - spark.vy * trailLength)
+
+                    // 1. Warstwa "Glow" (szeroka, kolorowa poświata)
+                    drawLine(
+                        color = spark.color.copy(alpha = spark.life * 0.5f),
+                        start = start,
+                        end = end,
+                        strokeWidth = 8f * spark.life, // Grubsza
+                        cap = StrokeCap.Round
+                    )
+
+                    // 2. Warstwa "Core" (cienki, biały środek-efekt gorąca)
+                    drawLine(
+                        color = Color.White.copy(alpha = spark.life),
+                        start = start,
+                        end = end,
+                        strokeWidth = 2f * spark.life, // Cienka
+                        cap = StrokeCap.Round
+                    )
+                }
             }
+
+
 
             // --- UI STATYSTYK ---
             Column(Modifier.width(220.dp).fillMaxHeight().padding(24.dp), Arrangement.Center) {
@@ -369,7 +416,7 @@ fun GameScreen(
                 Text("COMBO", color = Color.Magenta.copy(0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text("x$combo", color = Color(0xFFFF00FF), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(32.dp))
-                Text("beats: $beatenBeats / ${leftBeats.size}", color = Color(0xFFFF00FF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("beats: $beatenBeats / $beatsToHit", color = Color(0xFFFF00FF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 ///naprawić!!
                 Spacer(Modifier.height(32.dp))
                 GameButton(if (isPaused) "RESUME" else "PAUSE", Color.Cyan) {
@@ -381,33 +428,41 @@ fun GameScreen(
             }
 
             // --- OBSŁUGA KLAWIATURY ---
-            Box(Modifier.fillMaxSize().focusRequester(focusRequester).focusable().onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
-                        settings.leftKey -> { checkHit(leftBeats, "left"); true }
-                        settings.rightKey -> { checkHit(rightBeats, "right"); true }
-                        Key.Spacebar -> { isPaused = !isPaused; if (isPaused) audioPlayer.pause() else audioPlayer.resume(); true }
-                        else -> false
-                    }
-                } else false
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown) {
+
+                            val w = constraints.maxWidth.toFloat()
+                            val h = constraints.maxHeight.toFloat()
+
+                            val spreadX = w * 0.2f
+                            val targetYPos = h * 0.85f
+                            val leftT = (w / 2f) - spreadX + moveGameToRight
+                            val rightT = (w / 2f) + spreadX + moveGameToRight
+
+                            when (event.key) {
+                                settings.leftKey -> {
+                                    checkHit(leftBeats, "left", leftT, targetYPos)
+                                    true
+                                }
+                                settings.rightKey -> {
+                                    checkHit(rightBeats, "right", rightT, targetYPos)
+                                    true
+                                }
+                                Key.Spacebar -> {
+                                    isPaused = !isPaused
+                                    if (isPaused) audioPlayer.pause() else audioPlayer.resume()
+                                    true
+                                }
+                                else -> false
+                            }
+                        } else false
             })
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
-        }
-    }
-}
-
-data class WarpStar(
-    var x: Float, // Pozycja względem środka
-    var y: Float,
-    var z: Float, // Głębia (1000 = daleko, 0 = tuż przed ekranem)
-    var prevZ: Float = z
-) {
-    fun update(speed: Float) {
-        prevZ = z
-        z -= speed
-        if (z <= 1) { // Reset gwiazdy, gdy przeleci za nas
-            z = 1000f
-            prevZ = z
         }
     }
 }

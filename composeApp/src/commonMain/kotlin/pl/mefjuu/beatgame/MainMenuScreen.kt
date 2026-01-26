@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,7 +48,6 @@ fun MainMenuScreen(
     var sensitivity by remember { mutableStateOf(20f) }
     var threshold by remember { mutableStateOf(-40f) }
     var mergeGap by remember { mutableStateOf(0.1f) }
-    // ------------------------------
 
     var beatmapExists by remember(selectedBaseName) {
         mutableStateOf(selectedBaseName?.let { File("beatmaps/$it").exists() } ?: false)
@@ -56,18 +56,25 @@ fun MainMenuScreen(
     var background by remember { mutableStateOf(true) }
 
     Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFFDFCF0)).padding(20.dp),
+        modifier = Modifier.fillMaxSize().background(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFCFD8DC), // Jasny szaro-niebieski u góry
+                    Color(0xFF90A4AE)  // Ciemniejszy stalowy u dołu
+                )
+            )
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Beat Game By Orzeł", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+        Text("Beat Game By Orzeł", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
         Spacer(modifier = Modifier.height(20.dp))
         Text(selectedSongName, fontSize = 16.sp, color = Color.DarkGray)
 
         Text(
             "Detected beats: $beatsDetected",
             fontSize = 14.sp,
-            color = Color(0xFF388E3C), // Ładny zielony
+            color = Color(0xFF388E3C),
             fontWeight = FontWeight.Bold
         )
 
@@ -83,7 +90,7 @@ fun MainMenuScreen(
                         }
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373)) // Czerwony kolor
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373))
             ) {
                 Text("Delete & Re-analyze", color = Color.White)
             }
@@ -105,7 +112,7 @@ fun MainMenuScreen(
             Column(
                 modifier = Modifier
                     .padding(10.dp)
-                    .background(Color.Black.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1A1A1A).copy(alpha = 0.05f), RoundedCornerShape(8.dp))
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -146,13 +153,12 @@ fun MainMenuScreen(
                     val selectedFile = File(fileDialog.directory + fileDialog.file)
                     val baseName = selectedFile.nameWithoutExtension
 
-                    // --- KLUCZOWA POPRAWKA: Przechwycenie aktualnych stanów UI ---
+                    //  Przechwycenie aktualnych stanów UI
                     val currentDifficulty = selectedDifficulty
                     val currentSensitivity = sensitivity.toDouble()
                     val currentThreshold = threshold.toDouble()
                     val currentMergeGap = mergeGap.toDouble()
                     val isAdvancedMode = useAdvanced
-                    // -----------------------------------------------------------
 
                     scope.launch {
                         isLoading = true
@@ -167,7 +173,7 @@ fun MainMenuScreen(
                                     )
                                     analyzer.analyzeAndExport(selectedFile.absolutePath)
                                 } else {
-                                    // Używamy przechwyconego poziomu trudności
+                                    // poziom trudności
                                     val analyzer = BeatAnalyzer()
                                     println("You are selected difficulty: $currentDifficulty")
                                     analyzer.analyzeAndExport(selectedFile.absolutePath)
@@ -245,7 +251,7 @@ fun SettingsSlider(
         modifier = Modifier.fillMaxWidth(0.8f).padding(vertical = 4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$label: ${String.format("%.2f", value)}", fontSize = 12.sp, color = Color.Black)
+            Text("$label: ${String.format("%.2f", value)}", fontSize = 12.sp, color = Color(0xFF1A1A1A))
 
             Spacer(Modifier.width(8.dp))
 
@@ -279,7 +285,7 @@ fun SettingsSlider(
             }
         }
 
-        // Suwak jest teraz poza TooltipArea, więc działa idealnie
+        // Suwak jest teraz poza TooltipArea
         Slider(
             value = value,
             onValueChange = onValueChange,

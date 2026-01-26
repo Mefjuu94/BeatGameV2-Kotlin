@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // To daje dostęp do remember, mutableStateOf
-import androidx.compose.runtime.getValue // KLUCZOWE
-import androidx.compose.runtime.setValue // KLUCZOWE
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,7 +69,6 @@ fun EndScreen(score: Int, hits: Int, totalBeats: Int, onBackToMenu: () -> Unit) 
 fun SensitivityDialog(onDismiss: () -> Unit) {
     var sliderValue by remember { mutableStateOf(BeatAnalyzer.RMS_THRESHOLD.toFloat()) }
 
-    // Używamy Dialog z biblioteki Compose (androidx.compose.ui.window.Dialog)
     androidx.compose.ui.window.Dialog(onCloseRequest = onDismiss, title = "Set Impact Sensitivity") {
         Surface(
             modifier = Modifier.padding(16.dp),
@@ -100,9 +99,15 @@ fun SensitivityDialog(onDismiss: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DifficultySelector(current: String, onSelected: (String) -> Unit) {
-    val options = listOf("Easy", "Medium", "Hard")
+    val options = mapOf(
+        "Easy" to "0.5 second to next hit!",
+        "Medium" to "0.25 second to next hit!",
+        "Hard" to "0.1 second to next hit!"
+    )
+
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -110,15 +115,29 @@ fun DifficultySelector(current: String, onSelected: (String) -> Unit) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("MODE", fontWeight = FontWeight.Bold, color = Color.Black)
             Row {
-                options.forEach { text ->
-                    Row(
-                        modifier = Modifier
-                            .selectable(selected = (text == current), onClick = { onSelected(text) })
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                options.forEach { (text, hint) ->
+                    // Każda opcja dostaje swój TooltipBox
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White
+                            ) {
+                                Text(hint)
+                            }
+                        },
+                        state = rememberTooltipState()
                     ) {
-                        RadioButton(selected = (text == current), onClick = null)
-                        Text(text, Modifier.padding(start = 4.dp), color = Color.Black)
+                        Row(
+                            modifier = Modifier
+                                .selectable(selected = (text == current), onClick = { onSelected(text) })
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (text == current), onClick = null)
+                            Text(text, Modifier.padding(start = 4.dp), color = Color.Black)
+                        }
                     }
                 }
             }

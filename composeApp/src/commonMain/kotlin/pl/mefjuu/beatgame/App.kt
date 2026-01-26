@@ -8,11 +8,9 @@ enum class Screen { Menu, Game }
 fun App() {
     var currentScreen by remember { mutableStateOf(Screen.Menu) }
 
-    // Główne stany przekazywane między ekranami
     var selectedSong by remember { mutableStateOf("") }
     var difficulty by remember { mutableStateOf("Hard") }
 
-    // Tu trzymamy nasze klawisze, aby gra wiedziała, jakich użyć
     var gameSettings by remember { mutableStateOf(GameSettings()) }
     var drawBackground by remember { mutableStateOf(true) }
 
@@ -23,7 +21,7 @@ fun App() {
                 onStartGame = { song, diff, finalSettings, background ->
                     selectedSong = song
                     difficulty = diff
-                    gameSettings = finalSettings // Zapisujemy klawisze przed startem
+                    gameSettings = finalSettings
                     currentScreen = Screen.Game
                     drawBackground = background
                 }

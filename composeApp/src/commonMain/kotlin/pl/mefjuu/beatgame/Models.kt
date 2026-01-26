@@ -7,7 +7,7 @@ data class Beat(var time: Double, var isHit: Boolean = false)
 data class HitWave(
     val time: Double,
     val side: String,
-    val isMiss: Boolean = false // Przygotowane pod czerwoną falę
+    val isMiss: Boolean = false
 )
 
 data class GameSettings(

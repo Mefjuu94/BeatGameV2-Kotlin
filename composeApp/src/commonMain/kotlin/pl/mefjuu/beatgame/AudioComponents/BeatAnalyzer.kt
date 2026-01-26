@@ -22,7 +22,7 @@ class BeatAnalyzer() {
     private val BUFFER_SIZE = 256
     private val OVERLAP = 128
     private val MERGE_THRESHOLD = 0.1 // sekundy — scalanie bliskich beatów
-    private var KICK_GAP_THRESHOLD = 0.25 // sekundy — odstęp między kickami
+    private var KICK_GAP_THRESHOLD = 0.1 // sekundy — odstęp między kickami
 
     fun analyzeAndExport(audioPath: String): Int {
         var countBeats = 0
