@@ -43,6 +43,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation("be.tarsos.dsp:core:2.5")
             implementation("be.tarsos.dsp:jvm:2.5")
+            implementation("javazoom:jlayer:1.0.1")
+            implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

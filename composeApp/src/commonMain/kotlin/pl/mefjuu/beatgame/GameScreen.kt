@@ -16,6 +16,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
@@ -43,7 +44,7 @@ fun GameScreen(
 ) {
     // --- STAN GRY ---
     var isGameOver by remember { mutableStateOf(false) }
-    val pathToWav = "beatmaps/$baseName/$baseName.wav"
+    val pathToMp3 = "beatmaps/$baseName/$baseName.mp3"
     val pathToCsv = "beatmaps/$baseName/beatmap.csv"
 
     var currentTime by remember { mutableStateOf(0.0) }
@@ -56,7 +57,7 @@ fun GameScreen(
     val hitWaves = remember { mutableStateListOf<HitWave>() }
 
     val focusRequester = remember { FocusRequester() }
-    val audioPlayer = remember { AudioPlayer(pathToWav) }
+    val audioPlayer = remember { AudioPlayer(pathToMp3) }
     val beatMap = remember { BeatMap(pathToCsv) }
     var beatenBeats by remember { mutableIntStateOf(0) }
     var beatsLeft by remember { mutableIntStateOf(0) }
@@ -90,8 +91,12 @@ fun GameScreen(
     }
 
     LaunchedEffect(dynamicHue) {
-        currentLeftColor = Color.hsv(hue = dynamicHue, saturation = 0.8f, value = 1f)
-        currentRightColor = Color.hsv(hue = (dynamicHue + 180f) % 360f, saturation = 0.8f, value = 1f)
+        // Zapewniamy, że hue zawsze jest w zakresie 0..360
+        val leftHue = ((dynamicHue % 360f) + 360f) % 360f
+        val rightHue = (((dynamicHue + 180f) % 360f) + 360f) % 360f
+
+        currentLeftColor = Color.hsv(hue = leftHue, saturation = 0.8f, value = 1f)
+        currentRightColor = Color.hsv(hue = rightHue, saturation = 0.8f, value = 1f)
     }
 
     var beatsToHit by remember { mutableStateOf(0) }
@@ -192,15 +197,50 @@ fun GameScreen(
         // do obliczenia ile całości (aby nie zmieniało w czasie)
         beatsToHit = beatsLeft
 
-        audioPlayer.play()
+
+        val startDelaySeconds = 3.0
+        var musicStarted = false
+        var actualPlayStarted = false
+        audioPlayer.prepare() // "Rozgrzewamy" player tutaj
+        var startTimeMillis = System.currentTimeMillis() // Upewnij się, że to jest zainicjowane przed pętlą
+
         isLoading = false
-        while (true) {
-            withFrameMillis {
+
+        while (!isGameOver) { // Przenosimy warunek końca gry tutaj
+            withFrameMillis { frameTime ->
                 if (!isPaused) {
-                    currentTime = audioPlayer.timeSeconds
+                    val now = System.currentTimeMillis()
+
+                    if (!musicStarted) {
+                        // --- FAZA 1: ODLICZANIE ---
+                        val elapsedSinceStart = (now - startTimeMillis) / 1000.0
+                        if (elapsedSinceStart < startDelaySeconds) {
+                            currentTime = (elapsedSinceStart - startDelaySeconds).toDouble()
+                        } else {
+                            Thread {
+                                audioPlayer.play()
+                            }.start()
+                            musicStarted = true
+                        }
+
+                    } else {
+                        // --- FAZA 2: ODTWARZANIE ---
+                        // Sprawdzamy, czy player faktycznie zaczął wydawać dźwięk
+                        if (!actualPlayStarted && audioPlayer.isActive()) {
+                            actualPlayStarted = true
+                        }
+
+                        if (actualPlayStarted) {
+                            // Po fizycznym starcie czas bierzemy tylko z AudioPlayer
+                            currentTime = audioPlayer.timeSeconds.toDouble()
+                        } else {
+                            // Czekamy na buforowanie (nuta stoi na zerze)
+                            currentTime = 0.0
+                        }
+                    }
 
                     // --- AKTUALIZACJA ISKIER ---
-                    val delta = 0.016f // Stały krok czasu dla 60fps
+                    val delta = 0.016f
                     val sparkIterator = sparks.iterator()
                     while (sparkIterator.hasNext()) {
                         val s = sparkIterator.next()
@@ -208,13 +248,19 @@ fun GameScreen(
                         if (s.life <= 0) sparkIterator.remove()
                     }
 
+                    // --- LOGIKA TRAFIEŃ I KOŃCA GRY ---
                     hitWaves.removeAll { currentTime - it.time > 0.5 }
-                    if (currentTime >= audioPlayer.durationSeconds && audioPlayer.durationSeconds > 0) {
+
+                    if (musicStarted && currentTime >= audioPlayer.durationSeconds && audioPlayer.durationSeconds > 0) {
                         isGameOver = true
                     }
+                } else {
+                    // --- LOGIKA PAUZY ---
+                    // Przesuwamy startTimeMillis o czas trwania pauzy,
+                    // aby elapsedSinceStart stało w miejscu względem currentTime
+                    startTimeMillis = System.currentTimeMillis() - ((currentTime + startDelaySeconds) * 1000).toLong()
                 }
             }
-            if (isGameOver) break
         }
     }
 
@@ -235,6 +281,20 @@ fun GameScreen(
     if (isLoading) {
         Box(Modifier.fillMaxSize().background(Color(0xFF0F0F0F)), Alignment.Center) {
             CircularProgressIndicator(color = Color.Cyan)
+            if (currentTime < 0 && !isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val countdown = ceil(abs(currentTime)).toInt()
+                    Text(
+                        text = if (countdown > 0) "$countdown" else "GO!",
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 120.sp,
+                            fontWeight = FontWeight.Black,
+                            shadow = Shadow(Color.Cyan, blurRadius = 20f)
+                        )
+                    )
+                }
+            }
         }
     } else if (isGameOver) {
         EndScreen(score, beatenBeats, leftBeats.size + rightBeats.size + beatenBeats, onBackToMenu)
@@ -402,6 +462,33 @@ fun GameScreen(
                         end = end,
                         strokeWidth = 2f * spark.life, // Cienka
                         cap = StrokeCap.Round
+                    )
+                }
+            }
+
+            // --- WARSTWA ODLICZANIA (NA WIERZCHU) ---
+            if (!isLoading && currentTime < 0) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val secondsLeft = ceil(abs(currentTime)).toInt()
+
+                    // Wyświetlamy 3, 2, 1, a potem "GO!" na ułamek sekundy
+                    val displayText = if (secondsLeft > 0) "$secondsLeft" else "READY?"
+
+                    Text(
+                        text = displayText,
+                        modifier = Modifier.offset(x = (+100).dp),
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 120.sp,
+                            fontWeight = FontWeight.Black,
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Cyan.copy(alpha = 0.8f),
+                                blurRadius = 40f
+                            )
+                        )
                     )
                 }
             }

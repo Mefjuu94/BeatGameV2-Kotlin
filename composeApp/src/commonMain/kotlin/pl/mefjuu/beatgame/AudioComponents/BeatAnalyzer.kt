@@ -30,7 +30,7 @@ class BeatAnalyzer() {
         try {
             val audioFile = File(audioPath)
             val baseName = audioFile.getName().replace("\\.[^.]+$".toRegex(), "")
-            println(baseName)
+            println("basena z analizera $baseName")
             if (!Files.exists(Path.of("beatmaps\\" + baseName))) {
                 println("Analyzing and creating new beatmap.")
                 if (!audioFile.exists()) throw FileNotFoundException(audioPath)
@@ -59,6 +59,7 @@ class BeatAnalyzer() {
                         if (rms >= RMS_THRESHOLD) candidateTimes.add(time)
                         return true
                     }
+
                     override fun processingFinished() {}
                 })
 
@@ -81,6 +82,10 @@ class BeatAnalyzer() {
                     }
                 }
                 println("✅ Beatmap was generated: " + csvPath.toAbsolutePath() + " detected $countBeats beats")
+
+                val fileWavToClean: File = File(wavPath.toString())
+                cleanWav(fileWavToClean)
+
             } else if (Files.exists(Path.of("beatmaps\\" + baseName))) {
                 println("No need to analyzing, beat map was already created.")
             }
@@ -135,9 +140,22 @@ class BeatAnalyzer() {
         println("File with '.wav' extension created!")
         return wavPath
     }
+
     private class BeatRecord(var time: Double, var type: String?)
 
     companion object {
         var RMS_THRESHOLD: Double = 0.4
     }
+
+    private fun cleanWav(wavFile: File) {
+        if (wavFile.exists()) {
+            val deleted = wavFile.delete()
+            if (deleted) {
+                println("Sukces: Plik .wav został usunięty po analizie.")
+            } else {
+                println("Ostrzeżenie: Nie udało się usunąć pliku (może być nadal otwarty).")
+            }
+        }
+    }
+
 }
