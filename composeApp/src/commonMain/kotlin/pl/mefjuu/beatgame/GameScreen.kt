@@ -50,6 +50,7 @@ fun GameScreen(
     var currentTime by remember { mutableStateOf(0.0) }
     var score by remember { mutableStateOf(0) }
     var combo by remember { mutableStateOf(0) }
+    var comboSeries by remember { mutableStateOf(0) }
     var isPaused by remember { mutableStateOf(false) }
 
     val leftBeats = remember { mutableStateListOf<Beat>() }
@@ -142,6 +143,9 @@ fun GameScreen(
                 return
             }
         }
+        if(comboSeries < combo){
+            comboSeries = combo
+        }
         combo = 0
         hitWaves.add(HitWave(currentTime, side, isMiss = true))
     }
@@ -207,6 +211,7 @@ fun GameScreen(
         isLoading = false
 
         while (!isGameOver) { // Przenosimy warunek końca gry tutaj
+
             withFrameMillis { frameTime ->
                 if (!isPaused) {
                     val now = System.currentTimeMillis()
@@ -251,13 +256,10 @@ fun GameScreen(
                     // --- LOGIKA TRAFIEŃ I KOŃCA GRY ---
                     hitWaves.removeAll { currentTime - it.time > 0.5 }
 
-                    if (musicStarted && currentTime >= audioPlayer.durationSeconds && audioPlayer.durationSeconds > 0) {
+                    if (musicStarted && currentTime >= audioPlayer.durationSeconds - 0.5 && audioPlayer.durationSeconds > 0) {
                         isGameOver = true
                     }
                 } else {
-                    // --- LOGIKA PAUZY ---
-                    // Przesuwamy startTimeMillis o czas trwania pauzy,
-                    // aby elapsedSinceStart stało w miejscu względem currentTime
                     startTimeMillis = System.currentTimeMillis() - ((currentTime + startDelaySeconds) * 1000).toLong()
                 }
             }
@@ -297,7 +299,7 @@ fun GameScreen(
             }
         }
     } else if (isGameOver) {
-        EndScreen(score, beatenBeats, leftBeats.size + rightBeats.size + beatenBeats, onBackToMenu)
+        EndScreen(score, beatenBeats, leftBeats.size + rightBeats.size + beatenBeats, comboSeries, onBackToMenu)
     } else {
         BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
             Canvas(Modifier.fillMaxSize()) {

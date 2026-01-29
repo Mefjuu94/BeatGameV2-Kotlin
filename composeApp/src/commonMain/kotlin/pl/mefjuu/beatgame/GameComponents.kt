@@ -36,7 +36,7 @@ fun GameButton(text: String, color: Color, onClick: () -> Unit) {
 }
 
 @Composable
-fun EndScreen(score: Int, hits: Int, totalBeats: Int, onBackToMenu: () -> Unit) {
+fun EndScreen(score: Int, hits: Int, totalBeats: Int, longestSeries: Int, onBackToMenu: () -> Unit) {
     val efficiency = if (totalBeats > 0) (hits * 100) / totalBeats else 0
     Box(
         modifier = Modifier.fillMaxSize().background(Color(0xFF121212)),
@@ -47,6 +47,7 @@ fun EndScreen(score: Int, hits: Int, totalBeats: Int, onBackToMenu: () -> Unit) 
             Spacer(modifier = Modifier.height(24.dp))
             Text("Score: $score", color = Color.White, style = MaterialTheme.typography.bodyLarge)
             Text("Hits: $hits / $totalBeats", color = Color.White)
+            Text("Longest combo series: $longestSeries", color = Color.White)
             Text(
                 "Efficiency: $efficiency%",
                 color = if (efficiency > 70) Color.Green else Color.Yellow,
