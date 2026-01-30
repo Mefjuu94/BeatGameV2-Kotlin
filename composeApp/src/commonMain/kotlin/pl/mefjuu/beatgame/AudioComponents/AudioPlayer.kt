@@ -13,7 +13,6 @@ class AudioPlayer(filePath: String) {
             val baseStream = AudioSystem.getAudioInputStream(file)
             val baseFormat = baseStream.format
 
-            // Jeśli to MP3, musimy zdefiniować format wyjściowy (PCM)
             val decodedFormat = AudioFormat(
                 AudioFormat.Encoding.PCM_SIGNED,
                 baseFormat.sampleRate,
@@ -24,7 +23,6 @@ class AudioPlayer(filePath: String) {
                 false
             )
 
-            // Tworzymy strumień dekodujący
             val decodedStream = AudioSystem.getAudioInputStream(decodedFormat, baseStream)
 
             clip = AudioSystem.getClip()
@@ -56,8 +54,6 @@ class AudioPlayer(filePath: String) {
         }
     }
 
-    // Clip.getMicrosecondPosition() po starcie bywa niedokładny.
-    // Lepiej użyć Frame Position dla większej precyzji:
     val timeSeconds: Float
         get() = (clip?.framePosition?.toFloat() ?: 0f) / (clip?.format?.frameRate ?: 44100f)
 
@@ -68,7 +64,7 @@ class AudioPlayer(filePath: String) {
         get() = clip?.let { !it.isRunning && it.framePosition >= it.frameLength } ?: true
 
     fun isActive(): Boolean = clip?.isActive ?: false
-    // W AudioPlayer.kt
+
     fun prepare() {
         clip?.let {
             it.framePosition = 0

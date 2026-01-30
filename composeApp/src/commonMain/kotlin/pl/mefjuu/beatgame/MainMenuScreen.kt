@@ -307,6 +307,6 @@ fun deleteBeatmapFolder(baseName: String): Boolean {
 fun countBeatsInCsv(baseName: String): Int {
     val csvFile = File("beatmaps/$baseName/beatmap.csv")
     if (!csvFile.exists()) return 0
-    // Odczytujemy wszystkie linie i odejmujemy nagłówek
+
     return csvFile.readLines().size - 1
 }

@@ -201,46 +201,49 @@ fun GameScreen(
         // do obliczenia ile całości (aby nie zmieniało w czasie)
         beatsToHit = beatsLeft
 
-
         val startDelaySeconds = 3.0
         var musicStarted = false
-        var actualPlayStarted = false
-        audioPlayer.prepare() // "Rozgrzewamy" player tutaj
-        var startTimeMillis = System.currentTimeMillis() // Upewnij się, że to jest zainicjowane przed pętlą
+
+        audioPlayer.prepare()
+        var startTimeMillis = System.currentTimeMillis()
 
         isLoading = false
 
-        while (!isGameOver) { // Przenosimy warunek końca gry tutaj
+        var audioPreloaded = false
+        var musicSystemStartTime = 0L // Czas systemowy w momencie wywołania .play()
 
-            withFrameMillis { frameTime ->
+        while (!isGameOver) {
+            withFrameMillis {
                 if (!isPaused) {
                     val now = System.currentTimeMillis()
 
                     if (!musicStarted) {
-                        // --- FAZA 1: ODLICZANIE ---
                         val elapsedSinceStart = (now - startTimeMillis) / 1000.0
-                        if (elapsedSinceStart < startDelaySeconds) {
-                            currentTime = (elapsedSinceStart - startDelaySeconds).toDouble()
-                        } else {
-                            Thread {
-                                audioPlayer.play()
-                            }.start()
+                        currentTime = (elapsedSinceStart - startDelaySeconds).toDouble()
+
+                        if (currentTime >= -0.5 && !audioPreloaded) {
+                            audioPreloaded = true
+                            Thread { audioPlayer.prepare() }.start()
+                        }
+
+                        if (currentTime >= 0) {
+                            audioPlayer.play()
+                            musicSystemStartTime = now
                             musicStarted = true
                         }
-
                     } else {
-                        // --- FAZA 2: ODTWARZANIE ---
-                        // Sprawdzamy, czy player faktycznie zaczął wydawać dźwięk
-                        if (!actualPlayStarted && audioPlayer.isActive()) {
-                            actualPlayStarted = true
-                        }
+                        // --- KLUCZOWA POPRAWKA LAGÓW ---
+                        val timeSinceMusicStart = (now - musicSystemStartTime) / 1000.0
 
-                        if (actualPlayStarted) {
-                            // Po fizycznym starcie czas bierzemy tylko z AudioPlayer
-                            currentTime = audioPlayer.timeSeconds.toDouble()
+                        if (timeSinceMusicStart < 0.5) {
+                            currentTime = timeSinceMusicStart
                         } else {
-                            // Czekamy na buforowanie (nuta stoi na zerze)
-                            currentTime = 0.0
+                            val audioTime = audioPlayer.timeSeconds.toDouble()
+                            if (audioTime > 0) {
+                                currentTime = audioTime
+                            } else {
+                                currentTime = timeSinceMusicStart
+                            }
                         }
                     }
 
